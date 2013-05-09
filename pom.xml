@@ -11,14 +11,14 @@
   <version>1.0-SNAPSHOT</version>
   <packaging>hpi</packaging>
   <name>Jenkins Team Foundation Server Trigger Plugin</name>
-  
+
   <developers>
     <developer>
       <id>yasu_s</id>
       <name>Yasuyuki Saito</name>
     </developer>
   </developers>
-  
+
   <licenses>
     <license>
       <name>The MIT license</name>
@@ -26,7 +26,15 @@
       <distribution>repo</distribution>
     </license>
   </licenses>
-  
+
+  <dependencies>
+    <dependency>
+        <groupId>org.jenkins-ci.lib</groupId>
+        <artifactId>xtrigger-lib</artifactId>
+        <version>0.24</version>
+    </dependency>
+  </dependencies>
+
   <repositories>
     <repository>
       <id>repo.jenkins-ci.org</id>

@@ -1,0 +1,36 @@
+<j:jelly xmlns:j="jelly:core" xmlns:f="/lib/form">
+
+    <f:entry title="${%Server URL}" field="serverUrl">
+        <f:textbox default="http://127.0.0.1/tfs/" />
+    </f:entry>
+
+    <f:entry title="${%Login name}" field="userName">
+        <f:textbox />
+    </f:entry>
+
+    <f:entry title="${%User password}" field="userPassword">
+        <f:password />
+    </f:entry>
+
+    <f:entry title="${%Project Locations}">
+        <f:repeatable var="loc" name="locations" items="${instance.locations}" noAddButton="true" minimum="1">
+            <table width="100%">
+                <f:entry title="${%Project path}" field="projectPath">
+                    <f:textbox default="$/" value="${loc.projectPath}" />
+                </f:entry>
+                <f:entry>
+                    <div align="right">
+                        <input type="button" value="${%Add more locations...}" class="repeatable-add show-if-last" />
+                        <input type="button" value="${%Delete}" class="repeatable-delete show-if-not-only" style="margin-left: 1em;" />
+                    </div>
+                </f:entry>
+            </table>
+        </f:repeatable>
+    </f:entry>
+
+    <f:entry title="${%Schedule}">
+        <f:textarea name="cronTabSpec" help="/descriptor/hudson.triggers.TimerTrigger/help/spec"
+                    checkUrl="'${rootURL}/trigger/TimerTrigger/check?value='+encodeURIComponent(this.value)"
+                    value="${instance.spec}"/>
+    </f:entry>
+</j:jelly>
