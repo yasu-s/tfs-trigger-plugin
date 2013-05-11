@@ -17,19 +17,25 @@ import antlr.ANTLRException;
 
 public class TFSTrigger extends AbstractTrigger {
 
+    private final String nativeDirectory;
     private final String serverUrl;
     private final String userName;
     private final String userPassword;
     private ProjectLocation[] locations = new ProjectLocation[0];
 
     @DataBoundConstructor
-    public TFSTrigger(String serverUrl, String userName, String userPassword, List<ProjectLocation> locations,
-                        String cronTabSpec) throws ANTLRException {
+    public TFSTrigger(String nativeDirectory, String serverUrl, String userName, String userPassword,
+                        List<ProjectLocation> locations, String cronTabSpec) throws ANTLRException {
         super(cronTabSpec);
-        this.serverUrl    = serverUrl;
-        this.userName     = userName;
-        this.userPassword = userPassword;
-        this.locations    = locations.toArray(new ProjectLocation[locations.size()]);
+        this.nativeDirectory = nativeDirectory;
+        this.serverUrl       = serverUrl;
+        this.userName        = userName;
+        this.userPassword    = userPassword;
+        this.locations       = locations.toArray(new ProjectLocation[locations.size()]);
+    }
+
+    public String getNativeDirectory() {
+        return nativeDirectory;
     }
 
     public String getServerUrl() {
@@ -50,39 +56,52 @@ public class TFSTrigger extends AbstractTrigger {
 
     @Override
     protected File getLogFile() {
-        // TODO 自動生成されたメソッド・スタブ
-        return null;
+        return new File(job.getRootDir(), "tfs-trigger-polling.log");
     }
 
     @Override
     protected boolean requiresWorkspaceForPolling() {
-        // TODO 自動生成されたメソッド・スタブ
         return false;
     }
 
     @Override
     protected String getName() {
-        // TODO 自動生成されたメソッド・スタブ
-        return null;
-    }
-
-    @Override
-    protected Action[] getScheduledActions(Node pollingNode, XTriggerLog log) {
-        // TODO 自動生成されたメソッド・スタブ
-        return null;
-    }
-
-    @Override
-    protected boolean checkIfModified(Node pollingNode, XTriggerLog log)
-            throws XTriggerException {
-        // TODO 自動生成されたメソッド・スタブ
-        return false;
+        return "TFSTrigger";
     }
 
     @Override
     protected String getCause() {
-        // TODO 自動生成されたメソッド・スタブ
-        return null;
+        return Messages.TFSTrigger_Cause();
+    }
+
+    @Override
+    protected Action[] getScheduledActions(Node pollingNode, XTriggerLog log) {
+        return new Action[0];
+    }
+
+    @Override
+    protected boolean checkIfModified(Node pollingNode, XTriggerLog log) throws XTriggerException {
+
+        if (locations == null || locations.length == 0) {
+            log.info("No Loctation to poll.");
+            return false;
+        }
+
+        for (ProjectLocation location : locations) {
+            if (checkIfModifiedLocation(location, pollingNode, log))
+                return true;
+        }
+
+        return false;
+    }
+
+    private boolean checkIfModifiedLocation(ProjectLocation location, Node pollingNode, XTriggerLog log) throws XTriggerException {
+        return false;
+    }
+
+    @Override
+    public DescriptorImpl getDescriptor() {
+        return (DescriptorImpl)super.getDescriptor();
     }
 
     @Extension
