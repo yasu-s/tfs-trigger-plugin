@@ -33,6 +33,13 @@
         <artifactId>xtrigger-lib</artifactId>
         <version>0.24</version>
     </dependency>
+    <dependency>
+        <groupId>com.microsoft.tfs.sdk-11.0.0.jar</groupId>
+        <artifactId>com.microsoft.tfs.sdk-11.0.0.jar</artifactId>
+        <version>11.0.0</version>
+        <scope>system</scope>
+        <systemPath>${basedir}/lib/com.microsoft.tfs.sdk-11.0.0.jar</systemPath>
+    </dependency>
   </dependencies>
 
   <repositories>
