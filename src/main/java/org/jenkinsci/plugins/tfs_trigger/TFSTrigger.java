@@ -1,15 +1,24 @@
 package org.jenkinsci.plugins.tfs_trigger;
 
 import hudson.Extension;
+import hudson.model.AbstractBuild;
 import hudson.model.AbstractProject;
 import hudson.model.Action;
 import hudson.model.Hudson;
 import hudson.model.Node;
 
+import java.io.BufferedReader;
 import java.io.File;
+import java.io.FileOutputStream;
+import java.io.FileReader;
+import java.io.IOException;
+import java.io.PrintWriter;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Map.Entry;
 
 import org.jenkinsci.lib.xtrigger.AbstractTrigger;
 import org.jenkinsci.lib.xtrigger.XTriggerDescriptor;
@@ -24,22 +33,21 @@ public class TFSTrigger extends AbstractTrigger {
 
     private final String nativeDirectory;
     private final String serverUrl;
+    private final String projectCollection;
     private final String userName;
     private final String userPassword;
     private ProjectLocation[] locations = new ProjectLocation[0];
 
-    private int[] lastChangeSets = new int[0];
-
     @DataBoundConstructor
-    public TFSTrigger(String nativeDirectory, String serverUrl, String userName, String userPassword,
+    public TFSTrigger(String nativeDirectory, String serverUrl, String projectCollection, String userName, String userPassword,
                         List<ProjectLocation> locations, String cronTabSpec) throws ANTLRException {
         super(cronTabSpec);
-        this.nativeDirectory = nativeDirectory;
-        this.serverUrl       = serverUrl;
-        this.userName        = userName;
-        this.userPassword    = userPassword;
-        this.locations       = locations.toArray(new ProjectLocation[locations.size()]);
-        this.lastChangeSets  = new int[locations.size()];
+        this.nativeDirectory   = nativeDirectory;
+        this.serverUrl         = serverUrl;
+        this.projectCollection = projectCollection;
+        this.userName          = userName;
+        this.userPassword      = userPassword;
+        this.locations         = locations.toArray(new ProjectLocation[locations.size()]);
     }
 
     public String getNativeDirectory() {
@@ -48,6 +56,10 @@ public class TFSTrigger extends AbstractTrigger {
 
     public String getServerUrl() {
         return serverUrl;
+    }
+
+    public String getProjectCollection() {
+        return projectCollection;
     }
 
     public String getUserName() {
@@ -79,7 +91,18 @@ public class TFSTrigger extends AbstractTrigger {
 
     @Override
     protected String getCause() {
-        return Messages.TFSTrigger_Cause();
+        StringBuilder sb = new StringBuilder();
+        int cnt = 0;
+        try {
+            Map<String, Integer> changeSets = parseChangeSetFile();
+            for (Entry<String, Integer> entry : changeSets.entrySet()) {
+                sb.append(String.format("%1$d. %2$s ", ++cnt, entry.getKey()));
+                sb.append(String.format("(<a href=\"%1$s%2$s/_versionControl/changeset/%3$d\">%4$s: %3$d</a>)", serverUrl, projectCollection, entry.getValue(), Messages.ChangeSet()));
+                sb.append("<br />");
+            }
+        } catch (Exception e) {
+        }
+        return Messages.TFSTrigger_Cause(sb.toString());
     }
 
     @Override
@@ -95,7 +118,11 @@ public class TFSTrigger extends AbstractTrigger {
             return false;
         }
 
+        boolean modified = false;
+
         try {
+            Map<String, Integer> changeSets = parseChangeSetFile();
+
             TFSTriggerService service = new TFSTriggerService();
             service.setNativeDirectory(nativeDirectory);
             service.setServerUrl(serverUrl);
@@ -103,26 +130,86 @@ public class TFSTrigger extends AbstractTrigger {
             service.setUserPassword(userPassword);
             service.init();
 
-            for (int i = 0; i < locations.length; i++) {
-                if (checkIfModifiedLocation(service, i, log))
-                    return true;
+            for (ProjectLocation location : locations) {
+                if (checkIfModifiedLocation(service, location.getProjectPath(), log, changeSets)) {
+                    modified = true;
+                }
             }
+
+            saveChangeSetFile(changeSets);
         } catch (Exception ex) {
             throw new XTriggerException(ex);
         }
 
-        return false;
+        return modified;
     }
 
-    private boolean checkIfModifiedLocation(TFSTriggerService service, int index, XTriggerLog log) throws XTriggerException {
-        int changeSetId = service.getChangeSetID(locations[index].getProjectPath());
-        log.info(locations[index].getProjectPath() + ":" + changeSetId);
+    private boolean checkIfModifiedLocation(TFSTriggerService service, String path, XTriggerLog log, Map<String, Integer> changeSets) throws XTriggerException {
+        int changeSetID = service.getChangeSetID(path);
+        int lastChangeSetID = 0;
 
-        if (lastChangeSets[index] < changeSetId) {
-            lastChangeSets[index] = changeSetId;
+        if (changeSets.containsKey(path))
+            lastChangeSetID = changeSets.get(path);
+
+        if (lastChangeSetID < changeSetID) {
+            if (lastChangeSetID > 0)
+                log.info(path + ": " + lastChangeSetID + " -> " + changeSetID);
+            else
+                log.info(path + ": " + changeSetID);
+
+            changeSets.put(path, changeSetID);
             return true;
-        } else
+        } else {
+            log.info(path + ": " + changeSetID);
             return false;
+        }
+    }
+
+    public File getChangeSetFile() {
+        return new File(job.getRootDir(), "changeSet.txt");
+    }
+
+    private Map<String, Integer> parseChangeSetFile() throws IOException {
+        Map<String, Integer> changeSets = new HashMap<String, Integer>();
+        File file = getChangeSetFile();
+        if (!file.exists())
+            return changeSets;
+
+        BufferedReader br = null;
+        try {
+            br = new BufferedReader(new FileReader(file));
+
+            String line;
+            while ((line = br.readLine()) != null) {
+                int index = line.lastIndexOf('/');
+
+                if (index < 0)
+                    continue;
+
+                try {
+                    String path = line.substring(0, index);
+                    int changeSetID = Integer.parseInt(line.substring(index + 1));
+                    changeSets.put(path, changeSetID);
+                } catch (NumberFormatException ex) {
+                }
+            }
+        } finally {
+            if (br != null) br.close();
+        }
+
+        return changeSets;
+    }
+
+    private void saveChangeSetFile(Map<String, Integer> changeSets) throws IOException, InterruptedException  {
+        PrintWriter w = null;
+        try {
+            w = new PrintWriter(new FileOutputStream(getChangeSetFile()));
+            for (Entry<String, Integer> entry : changeSets.entrySet()) {
+                w.println(entry.getKey() + "/" + entry.getValue());
+            }
+        } finally {
+            if (w != null) w.close();
+        }
     }
 
     @Override

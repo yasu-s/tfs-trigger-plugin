@@ -8,6 +8,10 @@
         <f:textbox default="http://127.0.0.1/tfs/" />
     </f:entry>
 
+    <f:entry title="${%Project Collection}" field="projectCollection">
+        <f:textbox default="DefaultCollection" />
+    </f:entry>
+
     <f:entry title="${%Login name}" field="userName">
         <f:textbox />
     </f:entry>
