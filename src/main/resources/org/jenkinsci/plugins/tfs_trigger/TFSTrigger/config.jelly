@@ -4,6 +4,22 @@
         <f:textbox />
     </f:entry>
 
+    <f:entry title="${%TFS Version}" field="version">
+        <label>
+            <f:radio name="tfs.version" value="2012.2"
+                     checked="${instance.version == '2012.2' || empty instance.version}" />
+            ${%Version.2012.2}
+        </label>
+        <br />
+
+        <label>
+            <f:radio name="tfs.version" value="2012.3"
+                     checked="${instance.version == '2012.3'}" />
+            ${%Version.2012.3}
+        </label>
+        <br />
+    </f:entry>
+
     <f:entry title="${%Server URL}" field="serverUrl">
         <f:textbox default="http://127.0.0.1/tfs/" />
     </f:entry>

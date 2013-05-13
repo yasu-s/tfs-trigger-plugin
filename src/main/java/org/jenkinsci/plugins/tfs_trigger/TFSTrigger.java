@@ -1,7 +1,6 @@
 package org.jenkinsci.plugins.tfs_trigger;
 
 import hudson.Extension;
-import hudson.model.AbstractBuild;
 import hudson.model.AbstractProject;
 import hudson.model.Action;
 import hudson.model.Hudson;
@@ -20,6 +19,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 
+import org.apache.commons.lang.StringUtils;
 import org.jenkinsci.lib.xtrigger.AbstractTrigger;
 import org.jenkinsci.lib.xtrigger.XTriggerDescriptor;
 import org.jenkinsci.lib.xtrigger.XTriggerException;
@@ -31,7 +31,10 @@ import antlr.ANTLRException;
 
 public class TFSTrigger extends AbstractTrigger {
 
+    private static final String VERSION_2012_2 = "2012.2";
+
     private final String nativeDirectory;
+    private final String version;
     private final String serverUrl;
     private final String projectCollection;
     private final String userName;
@@ -39,10 +42,11 @@ public class TFSTrigger extends AbstractTrigger {
     private ProjectLocation[] locations = new ProjectLocation[0];
 
     @DataBoundConstructor
-    public TFSTrigger(String nativeDirectory, String serverUrl, String projectCollection, String userName, String userPassword,
+    public TFSTrigger(String nativeDirectory, String version, String serverUrl, String projectCollection, String userName, String userPassword,
                         List<ProjectLocation> locations, String cronTabSpec) throws ANTLRException {
         super(cronTabSpec);
         this.nativeDirectory   = nativeDirectory;
+        this.version           = StringUtils.isBlank(version) ? VERSION_2012_2 : version;
         this.serverUrl         = serverUrl;
         this.projectCollection = projectCollection;
         this.userName          = userName;
@@ -52,6 +56,10 @@ public class TFSTrigger extends AbstractTrigger {
 
     public String getNativeDirectory() {
         return nativeDirectory;
+    }
+
+    public String getVersion() {
+        return version;
     }
 
     public String getServerUrl() {
@@ -97,7 +105,10 @@ public class TFSTrigger extends AbstractTrigger {
             Map<String, Integer> changeSets = parseChangeSetFile();
             for (Entry<String, Integer> entry : changeSets.entrySet()) {
                 sb.append(String.format("%1$d. %2$s ", ++cnt, entry.getKey()));
-                sb.append(String.format("(<a href=\"%1$s%2$s/_versionControl/changeset/%3$d\">%4$s: %3$d</a>)", serverUrl, projectCollection, entry.getValue(), Messages.ChangeSet()));
+                if (VERSION_2012_2.equals(version))
+                    sb.append(String.format("(<a href=\"%1$s%2$s/_versionControl/changeset#cs=%3$d\">%4$s: %3$d</a>)", serverUrl, projectCollection, entry.getValue(), Messages.ChangeSet()));
+                else
+                    sb.append(String.format("(<a href=\"%1$s%2$s/_versionControl/changeset/%3$d\">%4$s: %3$d</a>)", serverUrl, projectCollection, entry.getValue(), Messages.ChangeSet()));
                 sb.append("<br />");
             }
         } catch (Exception e) {
@@ -188,6 +199,14 @@ public class TFSTrigger extends AbstractTrigger {
 
                 try {
                     String path = line.substring(0, index);
+                    boolean check = false;
+                    for (ProjectLocation location : locations) {
+                        if (location.getProjectPath().equals(path)) {
+                            check = true;
+                            break;
+                        }
+                    }
+                    if (!check) continue;
                     int changeSetID = Integer.parseInt(line.substring(index + 1));
                     changeSets.put(path, changeSetID);
                 } catch (NumberFormatException ex) {
