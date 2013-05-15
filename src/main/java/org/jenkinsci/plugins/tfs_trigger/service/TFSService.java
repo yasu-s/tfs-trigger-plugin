@@ -76,15 +76,12 @@ public class TFSService {
 
         if (item.getItemType() == ItemType.FOLDER) {
             for (Item i : versionClient.getItems(path, RecursionType.FULL).getItems()) {
-                if (excludedPatterns != null && excludedPatterns.length > 0) {
-                    if (isPatterns(i.getServerItem(), excludedPatterns))
-                        continue;
-                }
+                String childPath = i.getServerItem().charAt(0) == '$' ? i.getServerItem().substring(1) : i.getServerItem();
+                if (excludedPatterns != null && excludedPatterns.length > 0 && isPatterns(childPath, excludedPatterns))
+                    continue;
 
-                if (includedPatterns != null && includedPatterns.length > 0) {
-                    if (!isPatterns(i.getServerItem(), includedPatterns))
-                        continue;
-                }
+                if (includedPatterns != null && includedPatterns.length > 0 && !isPatterns(childPath, includedPatterns))
+                    continue;
 
                 if (changeSetID < i.getChangeSetID())
                     changeSetID = i.getChangeSetID();
