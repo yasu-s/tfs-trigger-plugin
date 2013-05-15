@@ -2,6 +2,7 @@ package org.jenkinsci.plugins.tfs_trigger.service;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.regex.Pattern;
 
 import com.microsoft.tfs.core.TFSTeamProjectCollection;
 import com.microsoft.tfs.core.clients.versioncontrol.VersionControlClient;
@@ -11,16 +12,13 @@ import com.microsoft.tfs.core.clients.versioncontrol.soapextensions.ItemType;
 import com.microsoft.tfs.core.clients.versioncontrol.soapextensions.RecursionType;
 import com.microsoft.tfs.core.clients.workitem.WorkItem;
 import com.microsoft.tfs.core.clients.workitem.WorkItemClient;
-import com.microsoft.tfs.core.clients.workitem.link.Hyperlink;
-import com.microsoft.tfs.core.clients.workitem.link.LinkFactory;
 import com.microsoft.tfs.core.httpclient.Credentials;
 import com.microsoft.tfs.core.httpclient.UsernamePasswordCredentials;
 import com.microsoft.tfs.core.util.URIUtils;
 
-public class TFSTriggerService {
+public class TFSService {
 
     private static final String PROPERTY_NAME_NATIVE_DIRECTORY = "com.microsoft.tfs.jni.native.base-directory";
-    private static final String WORK_ITEM_FIELDS_NAME_HISTORY = "System.History";
 
     private String nativeDirectory;
     private String serverUrl;
@@ -72,18 +70,36 @@ public class TFSTriggerService {
         workItemClient = tfsCollection.getWorkItemClient();
     }
 
-    public int getChangeSetID(String path) {
+    public int getChangeSetID(String path, Pattern[] excludedPatterns, Pattern[] includedPatterns) {
         Item item = versionClient.getItem(path);
         int changeSetID = item.getChangeSetID();
 
         if (item.getItemType() == ItemType.FOLDER) {
             for (Item i : versionClient.getItems(path, RecursionType.FULL).getItems()) {
+                if (excludedPatterns != null && excludedPatterns.length > 0) {
+                    if (isPatterns(i.getServerItem(), excludedPatterns))
+                        continue;
+                }
+
+                if (includedPatterns != null && includedPatterns.length > 0) {
+                    if (!isPatterns(i.getServerItem(), includedPatterns))
+                        continue;
+                }
+
                 if (changeSetID < i.getChangeSetID())
                     changeSetID = i.getChangeSetID();
             }
         }
 
         return changeSetID;
+    }
+
+    public static boolean isPatterns(String path, Pattern[] patterns) {
+        for (Pattern pattern : patterns) {
+            if (pattern.matcher(path).matches())
+                return true;
+        }
+        return false;
     }
 
     public List<Integer> getWorkItemIDs(int changeSetID) {
@@ -95,12 +111,4 @@ public class TFSTriggerService {
         return ids;
     }
 
-    public void addHyperlink(int workItemID, String url, String comment, String history) {
-        WorkItem item = workItemClient.getWorkItemByID(workItemID);
-        item.open();
-        Hyperlink link = LinkFactory.newHyperlink(url, comment, true);
-        item.getLinks().add(link);
-        item.getFields().getField(WORK_ITEM_FIELDS_NAME_HISTORY).setValue(history);
-        item.save();
-    }
 }

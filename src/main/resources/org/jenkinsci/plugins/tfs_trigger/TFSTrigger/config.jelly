@@ -28,6 +28,10 @@
         <f:textbox default="DefaultCollection" />
     </f:entry>
 
+    <f:entry title="${%Project}" field="project">
+        <f:textbox />
+    </f:entry>
+
     <f:entry title="${%Login name}" field="userName">
         <f:textbox />
     </f:entry>
@@ -57,4 +61,13 @@
                     checkUrl="'${rootURL}/trigger/TimerTrigger/check?value='+encodeURIComponent(this.value)"
                     value="${instance.spec}"/>
     </f:entry>
+
+    <f:advanced>
+        <f:entry title="${%Excluded Regions}" field="excludedRegions">
+            <f:textarea />
+        </f:entry>
+        <f:entry title="${%Included Regions}" field="includedRegions">
+            <f:textarea />
+        </f:entry>
+    </f:advanced>
 </j:jelly>
