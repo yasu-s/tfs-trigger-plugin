@@ -163,12 +163,28 @@ public class TFSTrigger extends AbstractTrigger {
         int cnt = 0;
         try {
             Map<String, Integer> changeSets = parseChangeSetFile();
+            TFSService service = createTFSService();
+
             for (Entry<String, Integer> entry : changeSets.entrySet()) {
                 sb.append(String.format("%1$d. %2$s ", ++cnt, entry.getKey()));
+
                 if (VERSION_2012_2.equals(version))
-                    sb.append(String.format("(<a href=\"%1$s%2$s/%3$s/_versionControl/changeset#cs=%4$d\">%5$s: %4$d</a>)", serverUrl, projectCollection, project, entry.getValue(), Messages.ChangeSet()));
+                    sb.append(String.format("(%1$s: <a href=\"%2$s%3$s/%4$s/_versionControl/changesets#cs=%5$d\">%5$d</a>)", Messages.ChangeSet(), serverUrl, projectCollection, project, entry.getValue()));
                 else
-                    sb.append(String.format("(<a href=\"%1$s%2$s/%3$s/_versionControl/changeset/%4$d\">%5$s: %4$d</a>)", serverUrl, projectCollection, project, entry.getValue(), Messages.ChangeSet()));
+                    sb.append(String.format("(%1$s: <a href=\"%2$s%3$s/%4$s/_versionControl/changeset/%5$d\">%5$d</a>)", Messages.ChangeSet(), serverUrl, projectCollection, project, entry.getValue()));
+
+                List<Integer> workItemIDs = service.getWorkItemIDs(entry.getValue());
+                if (workItemIDs != null && workItemIDs.size() > 0) {
+                    sb.append(" (" + Messages.WorkItem() + ": ");
+                    boolean first = true;
+                    for (int workItemID : workItemIDs) {
+                        if (!first) sb.append(", ");
+                        sb.append(String.format("<a href=\"%1$s%2$s/%3$s/_workitems#id=%4$d&_a=edit\">%4$d</a>", serverUrl, projectCollection, project, workItemID));
+                        first = false;
+                    }
+                    sb.append(")");
+                }
+
                 sb.append("<br />");
             }
         } catch (Exception e) {
@@ -195,13 +211,7 @@ public class TFSTrigger extends AbstractTrigger {
             Map<String, Integer> changeSets = parseChangeSetFile();
             Pattern[] excludedPatterns = getExcludedRegionsPatterns();
             Pattern[] includedPatterns = getIncludedRegionsPatterns();
-
-            TFSService service = new TFSService();
-            service.setNativeDirectory(nativeDirectory);
-            service.setServerUrl(serverUrl);
-            service.setUserName(userName);
-            service.setUserPassword(userPassword);
-            service.init();
+            TFSService service = createTFSService();
 
             for (ProjectLocation location : locations) {
                 if (checkIfModifiedLocation(service, location.getProjectPath(), log, changeSets, excludedPatterns, includedPatterns)) {
@@ -215,6 +225,16 @@ public class TFSTrigger extends AbstractTrigger {
         }
 
         return modified;
+    }
+
+    private TFSService createTFSService() {
+        TFSService service = new TFSService();
+        service.setNativeDirectory(nativeDirectory);
+        service.setServerUrl(serverUrl);
+        service.setUserName(userName);
+        service.setUserPassword(userPassword);
+        service.init();
+        return service;
     }
 
     private boolean checkIfModifiedLocation(TFSService service, String path, XTriggerLog log, Map<String, Integer> changeSets,
