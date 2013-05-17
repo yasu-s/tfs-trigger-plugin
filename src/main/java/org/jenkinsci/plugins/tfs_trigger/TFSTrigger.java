@@ -6,15 +6,9 @@ import hudson.model.Action;
 import hudson.model.Hudson;
 import hudson.model.Node;
 
-import java.io.BufferedReader;
 import java.io.File;
-import java.io.FileOutputStream;
-import java.io.FileReader;
-import java.io.IOException;
-import java.io.PrintWriter;
 import java.util.Collection;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -25,14 +19,15 @@ import org.jenkinsci.lib.xtrigger.AbstractTrigger;
 import org.jenkinsci.lib.xtrigger.XTriggerDescriptor;
 import org.jenkinsci.lib.xtrigger.XTriggerException;
 import org.jenkinsci.lib.xtrigger.XTriggerLog;
-import org.jenkinsci.plugins.tfs_trigger.service.TFSService;
+import org.jenkinsci.plugins.service.TFSService;
+import org.jenkinsci.plugins.util.Constants;
+import org.jenkinsci.plugins.util.ProjectLocation;
+import org.jenkinsci.plugins.util.TFSUtil;
 import org.kohsuke.stapler.DataBoundConstructor;
 
 import antlr.ANTLRException;
 
 public class TFSTrigger extends AbstractTrigger {
-
-    private static final String VERSION_2012_2 = "2012.2";
 
     private final String nativeDirectory;
     private final String version;
@@ -51,7 +46,7 @@ public class TFSTrigger extends AbstractTrigger {
                         String cronTabSpec, String excludedRegions, String includedRegions) throws ANTLRException {
         super(cronTabSpec);
         this.nativeDirectory   = nativeDirectory;
-        this.version           = StringUtils.isBlank(version) ? VERSION_2012_2 : version;
+        this.version           = StringUtils.isBlank(version) ? Constants.VERSION_2012_2 : version;
         this.serverUrl         = serverUrl;
         this.projectCollection = projectCollection;
         this.project           = project;
@@ -102,7 +97,7 @@ public class TFSTrigger extends AbstractTrigger {
         return StringUtils.isBlank(excludedRegions) ? null : excludedRegions.split("[\\r\\n]+");
     }
 
-    private Pattern[] getExcludedRegionsPatterns() {
+    public Pattern[] getExcludedRegionsPatterns() {
         String[] excluded = getExcludedRegionsNormalized();
         if (excluded != null) {
             Pattern[] patterns = new Pattern[excluded.length];
@@ -126,7 +121,7 @@ public class TFSTrigger extends AbstractTrigger {
         return StringUtils.isBlank(includedRegions) ? null : includedRegions.split("[\\r\\n]+");
     }
 
-    private Pattern[] getIncludedRegionsPatterns() {
+    public Pattern[] getIncludedRegionsPatterns() {
         String[] included = getIncludedRegionsNormalized();
         if (included != null) {
             Pattern[] patterns = new Pattern[included.length];
@@ -162,16 +157,14 @@ public class TFSTrigger extends AbstractTrigger {
         StringBuilder sb = new StringBuilder();
         int cnt = 0;
         try {
-            Map<String, Integer> changeSets = parseChangeSetFile();
+            Map<String, Integer> changeSets = TFSUtil.parseChangeSetFile(getChangeSetFilePath(), locations);
             TFSService service = createTFSService();
 
             for (Entry<String, Integer> entry : changeSets.entrySet()) {
                 sb.append(String.format("%1$d. %2$s ", ++cnt, entry.getKey()));
 
-                if (VERSION_2012_2.equals(version))
-                    sb.append(String.format("(%1$s: <a href=\"%2$s%3$s/%4$s/_versionControl/changesets#cs=%5$d\">%5$d</a>)", Messages.ChangeSet(), serverUrl, projectCollection, project, entry.getValue()));
-                else
-                    sb.append(String.format("(%1$s: <a href=\"%2$s%3$s/%4$s/_versionControl/changeset/%5$d\">%5$d</a>)", Messages.ChangeSet(), serverUrl, projectCollection, project, entry.getValue()));
+                String url = TFSUtil.getChangeSetUrl(version, serverUrl, projectCollection, project, entry.getValue());
+                sb.append(String.format("(%s: <a href=\"%s\">%d</a>)", Messages.ChangeSet(), url, entry.getValue()));
 
                 List<Integer> workItemIDs = service.getWorkItemIDs(entry.getValue());
                 if (workItemIDs != null && workItemIDs.size() > 0) {
@@ -179,7 +172,7 @@ public class TFSTrigger extends AbstractTrigger {
                     boolean first = true;
                     for (int workItemID : workItemIDs) {
                         if (!first) sb.append(", ");
-                        sb.append(String.format("<a href=\"%1$s%2$s/%3$s/_workitems#id=%4$d&_a=edit\">%4$d</a>", serverUrl, projectCollection, project, workItemID));
+                        sb.append(String.format("<a href=\"%s\">%d</a>", TFSUtil.getWorkItemUrl(serverUrl, projectCollection, project, workItemID), workItemID));
                         first = false;
                     }
                     sb.append(")");
@@ -208,7 +201,7 @@ public class TFSTrigger extends AbstractTrigger {
         boolean modified = false;
 
         try {
-            Map<String, Integer> changeSets = parseChangeSetFile();
+            Map<String, Integer> changeSets = TFSUtil.parseChangeSetFile(getChangeSetFilePath(), locations);
             Pattern[] excludedPatterns = getExcludedRegionsPatterns();
             Pattern[] includedPatterns = getIncludedRegionsPatterns();
             TFSService service = createTFSService();
@@ -219,7 +212,7 @@ public class TFSTrigger extends AbstractTrigger {
                 }
             }
 
-            saveChangeSetFile(changeSets);
+            TFSUtil.saveChangeSetFile(getChangeSetFilePath(), changeSets);
         } catch (Exception ex) {
             throw new XTriggerException(ex);
         }
@@ -228,12 +221,8 @@ public class TFSTrigger extends AbstractTrigger {
     }
 
     private TFSService createTFSService() {
-        TFSService service = new TFSService();
-        service.setNativeDirectory(nativeDirectory);
-        service.setServerUrl(serverUrl);
-        service.setUserName(userName);
-        service.setUserPassword(userPassword);
-        service.init();
+        TFSUtil.setNativeDirectory(nativeDirectory);
+        TFSService service = new TFSService(serverUrl, userName, userPassword);
         return service;
     }
 
@@ -259,59 +248,8 @@ public class TFSTrigger extends AbstractTrigger {
         }
     }
 
-    public File getChangeSetFile() {
+    public File getChangeSetFilePath() {
         return new File(job.getRootDir(), "changeSet.txt");
-    }
-
-    private Map<String, Integer> parseChangeSetFile() throws IOException {
-        Map<String, Integer> changeSets = new HashMap<String, Integer>();
-        File file = getChangeSetFile();
-        if (!file.exists())
-            return changeSets;
-
-        BufferedReader br = null;
-        try {
-            br = new BufferedReader(new FileReader(file));
-
-            String line;
-            while ((line = br.readLine()) != null) {
-                int index = line.lastIndexOf('/');
-
-                if (index < 0)
-                    continue;
-
-                try {
-                    String path = line.substring(0, index);
-                    boolean check = false;
-                    for (ProjectLocation location : locations) {
-                        if (location.getProjectPath().equals(path)) {
-                            check = true;
-                            break;
-                        }
-                    }
-                    if (!check) continue;
-                    int changeSetID = Integer.parseInt(line.substring(index + 1));
-                    changeSets.put(path, changeSetID);
-                } catch (NumberFormatException ex) {
-                }
-            }
-        } finally {
-            if (br != null) br.close();
-        }
-
-        return changeSets;
-    }
-
-    private void saveChangeSetFile(Map<String, Integer> changeSets) throws IOException, InterruptedException  {
-        PrintWriter w = null;
-        try {
-            w = new PrintWriter(new FileOutputStream(getChangeSetFile()));
-            for (Entry<String, Integer> entry : changeSets.entrySet()) {
-                w.println(entry.getKey() + "/" + entry.getValue());
-            }
-        } finally {
-            if (w != null) w.close();
-        }
     }
 
     @Override
@@ -332,4 +270,5 @@ public class TFSTrigger extends AbstractTrigger {
             return Messages.TFSTrigger_DisplayName();
         }
     }
+
 }

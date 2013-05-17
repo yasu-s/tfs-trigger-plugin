@@ -1,8 +1,8 @@
-package org.jenkinsci.plugins.tfs_trigger.service;
+package org.jenkinsci.plugins.service;
 
 import java.util.regex.Pattern;
 
-import org.jenkinsci.plugins.tfs_trigger.service.TFSService;
+import org.jenkinsci.plugins.service.TFSService;
 import org.junit.Assert;
 import org.junit.Test;
 

@@ -1,4 +1,4 @@
-package org.jenkinsci.plugins.tfs_trigger;
+package org.jenkinsci.plugins.util;
 
 import java.io.Serializable;
 
