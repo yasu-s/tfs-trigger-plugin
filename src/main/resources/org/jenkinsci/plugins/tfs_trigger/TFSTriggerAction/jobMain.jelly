@@ -1,7 +1,15 @@
 <j:jelly xmlns:j="jelly:core" xmlns:d="jelly:define" xmlns:l="/lib/layout" xmlns:t="/lib/hudson" xmlns:f="/lib/form" xmlns:i="jelly:fmt" xmlns:u="/hudson/plugins/robot/util">
     <table style="margin-top: 1em; margin-left:1em;">
         <t:summary icon="orange-square.png">
-
+            <b>${%Title}</b> <br/>
+            <j:choose>
+                <j:when test="${empty it.changeSetLink}">
+                    ${%Not Run}
+                </j:when>
+                <j:otherwise>
+                    ${it.changeSetLink}
+                </j:otherwise>
+            </j:choose>
         </t:summary>
     </table>
 </j:jelly>

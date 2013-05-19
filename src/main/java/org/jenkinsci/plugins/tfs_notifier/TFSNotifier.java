@@ -16,6 +16,7 @@ import hudson.Extension;
 import hudson.Launcher;
 import hudson.model.AbstractBuild;
 import hudson.model.AbstractProject;
+import hudson.model.Action;
 import hudson.model.BuildListener;
 import hudson.model.Result;
 import hudson.tasks.BuildStepDescriptor;
@@ -38,6 +39,12 @@ public class TFSNotifier extends Notifier {
     public boolean perform(AbstractBuild<?, ?> build, Launcher launcher, BuildListener listener) throws InterruptedException, IOException {
         try {
             TFSTrigger trigger = (TFSTrigger)build.getProject().getTrigger(TFSTrigger.class);
+
+            if (trigger == null) {
+                listener.getLogger().println("TFSTrigger not setting.");
+                return true;
+            }
+
             TFSService service= new TFSService(trigger.getServerUrl(), trigger.getUserName(), trigger.getUserPassword());
 
             Map<String, Integer> changeSets = TFSUtil.parseChangeSetFile(getChangeSetFile(build), trigger.getLocations());
@@ -83,6 +90,11 @@ public class TFSNotifier extends Notifier {
 
                 TFSUtil.saveChangeSetFile(getChangeSetFile(build), changeSets);
             }
+
+            String changeSetUrl = currentChangeSetID <= 0 ? "" : TFSUtil.getChangeSetUrl(trigger.getVersion(), trigger.getServerUrl(), trigger.getProjectCollection(), trigger.getProject(), currentChangeSetID);
+            Action action = new TFSNotifierAction(currentChangeSetID, changeSetUrl);
+            build.addAction(action);
+
         } catch (Exception e) {
             listener.getLogger().println(e.getMessage());
         }

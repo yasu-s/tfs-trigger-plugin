@@ -1,0 +1,14 @@
+<j:jelly xmlns:j="jelly:core" xmlns:d="jelly:define" xmlns:l="/lib/layout"
+         xmlns:t="/lib/hudson" xmlns:f="/lib/form" xmlns:i="jelly:fmt">
+    <t:summary icon="orange-square.png">
+        ${%TFS} <br/>
+        <j:choose>
+            <j:when test="${empty it.url}">
+                ${%Not Run}
+            </j:when>
+            <j:otherwise>
+                ${%ChangeSet(it.url, it.changeSetID)}
+            </j:otherwise>
+        </j:choose>
+    </t:summary>
+</j:jelly>

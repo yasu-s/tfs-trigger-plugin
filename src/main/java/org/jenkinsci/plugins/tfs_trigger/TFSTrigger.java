@@ -7,11 +7,11 @@ import hudson.model.Hudson;
 import hudson.model.Node;
 
 import java.io.File;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
-import java.util.Map.Entry;
 import java.util.regex.Pattern;
 
 import org.apache.commons.lang.StringUtils;
@@ -29,7 +29,6 @@ import antlr.ANTLRException;
 
 public class TFSTrigger extends AbstractTrigger {
 
-    private final String nativeDirectory;
     private final String version;
     private final String serverUrl;
     private final String projectCollection;
@@ -39,13 +38,13 @@ public class TFSTrigger extends AbstractTrigger {
     private ProjectLocation[] locations = new ProjectLocation[0];
     private final String excludedRegions;
     private final String includedRegions;
+    private List<TFSLinkAction> actions = new ArrayList<TFSLinkAction>();
 
     @DataBoundConstructor
-    public TFSTrigger(String nativeDirectory, String version, String serverUrl, String projectCollection, String project,
+    public TFSTrigger(String version, String serverUrl, String projectCollection, String project,
                         String userName, String userPassword, List<ProjectLocation> locations,
                         String cronTabSpec, String excludedRegions, String includedRegions) throws ANTLRException {
         super(cronTabSpec);
-        this.nativeDirectory   = nativeDirectory;
         this.version           = StringUtils.isBlank(version) ? Constants.VERSION_2012_2 : version;
         this.serverUrl         = serverUrl;
         this.projectCollection = projectCollection;
@@ -55,10 +54,6 @@ public class TFSTrigger extends AbstractTrigger {
         this.locations         = locations.toArray(new ProjectLocation[locations.size()]);
         this.excludedRegions   = excludedRegions;
         this.includedRegions   = includedRegions;
-    }
-
-    public String getNativeDirectory() {
-        return nativeDirectory;
     }
 
     public String getVersion() {
@@ -154,44 +149,20 @@ public class TFSTrigger extends AbstractTrigger {
 
     @Override
     protected String getCause() {
-        StringBuilder sb = new StringBuilder();
-        int cnt = 0;
-        try {
-            Map<String, Integer> changeSets = TFSUtil.parseChangeSetFile(getChangeSetFilePath(), locations);
-            TFSService service = createTFSService();
-
-            for (Entry<String, Integer> entry : changeSets.entrySet()) {
-                sb.append(String.format("%1$d. %2$s ", ++cnt, entry.getKey()));
-
-                String url = TFSUtil.getChangeSetUrl(version, serverUrl, projectCollection, project, entry.getValue());
-                sb.append(String.format("(%s: <a href=\"%s\">%d</a>)", Messages.ChangeSet(), url, entry.getValue()));
-
-                List<Integer> workItemIDs = service.getWorkItemIDs(entry.getValue());
-                if (workItemIDs != null && workItemIDs.size() > 0) {
-                    sb.append(" (" + Messages.WorkItem() + ": ");
-                    boolean first = true;
-                    for (int workItemID : workItemIDs) {
-                        if (!first) sb.append(", ");
-                        sb.append(String.format("<a href=\"%s\">%d</a>", TFSUtil.getWorkItemUrl(serverUrl, projectCollection, project, workItemID), workItemID));
-                        first = false;
-                    }
-                    sb.append(")");
-                }
-
-                sb.append("<br />");
-            }
-        } catch (Exception e) {
-        }
-        return Messages.TFSTrigger_Cause(sb.toString());
+        return Messages.TFSTrigger_Cause(actions.size() == 0 ? "" : actions.get(0).getLink());
     }
 
     @Override
     protected Action[] getScheduledActions(Node pollingNode, XTriggerLog log) {
-        return new Action[0];
+        return actions.toArray(new TFSLinkAction[actions.size()]);
     }
 
     @Override
     protected boolean checkIfModified(Node pollingNode, XTriggerLog log) throws XTriggerException {
+        if (actions == null)
+            actions = new ArrayList<TFSLinkAction>();
+        else
+            actions.clear();
 
         if (locations == null || locations.length == 0) {
             log.info("No Loctation to poll.");
@@ -213,6 +184,12 @@ public class TFSTrigger extends AbstractTrigger {
             }
 
             TFSUtil.saveChangeSetFile(getChangeSetFilePath(), changeSets);
+
+            if (modified) {
+                String link = TFSUtil.createChangeSetLink(version, serverUrl, projectCollection, project, userName, userPassword, locations, getChangeSetFilePath());
+                TFSLinkAction action = new TFSLinkAction(link);
+                actions.add(action);
+            }
         } catch (Exception ex) {
             throw new XTriggerException(ex);
         }
@@ -221,7 +198,6 @@ public class TFSTrigger extends AbstractTrigger {
     }
 
     private TFSService createTFSService() {
-        TFSUtil.setNativeDirectory(nativeDirectory);
         TFSService service = new TFSService(serverUrl, userName, userPassword);
         return service;
     }

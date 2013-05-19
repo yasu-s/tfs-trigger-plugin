@@ -5,6 +5,7 @@ import java.io.IOException;
 import java.nio.charset.Charset;
 
 import org.apache.commons.jelly.XMLOutput;
+import org.jenkinsci.plugins.util.TFSUtil;
 
 import hudson.Util;
 import hudson.console.AnnotatedLargeText;
@@ -48,5 +49,9 @@ public class TFSTriggerAction implements Action {
 
     public void writeLogTo(XMLOutput out) throws IOException {
         new AnnotatedLargeText<TFSTriggerAction>(getLogFile(), Charset.defaultCharset(), true, this).writeHtmlTo(0, out.asWriter());
+    }
+
+    public String getChangeSetLink() {
+        return TFSUtil.getLastChangeSetLink((AbstractProject<?, ?>)job);
     }
 }
