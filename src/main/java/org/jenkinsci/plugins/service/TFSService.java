@@ -104,4 +104,9 @@ public class TFSService {
         item.save();
     }
 
+    public void close() {
+        if (workItemClient != null) workItemClient.close();
+        if (versionClient != null) versionClient.close();
+        if (tfsCollection != null) tfsCollection.close();
+    }
 }

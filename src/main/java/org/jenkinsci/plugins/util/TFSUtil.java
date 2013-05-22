@@ -86,9 +86,10 @@ public abstract class TFSUtil {
             String userName, String userPassword, ProjectLocation[] locations, File changeSetFile) {
         StringBuilder sb = new StringBuilder();
         int cnt = 0;
+        TFSService service = null;
         try {
             Map<String, Integer> changeSets = parseChangeSetFile(changeSetFile, locations);
-            TFSService service = new TFSService(serverUrl, userName, userPassword);
+            service = new TFSService(serverUrl, userName, userPassword);
 
             for (Entry<String, Integer> entry : changeSets.entrySet()) {
                 sb.append(String.format("%1$d. %2$s ", ++cnt, entry.getKey()));
@@ -111,6 +112,8 @@ public abstract class TFSUtil {
                 sb.append("<br />\n");
             }
         } catch (Exception e) {
+        } finally {
+            if (service != null) service.close();
         }
         return sb.toString();
     }

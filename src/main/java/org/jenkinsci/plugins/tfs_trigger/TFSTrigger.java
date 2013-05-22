@@ -170,12 +170,13 @@ public class TFSTrigger extends AbstractTrigger {
         }
 
         boolean modified = false;
+        TFSService service =null;
 
         try {
             Map<String, Integer> changeSets = TFSUtil.parseChangeSetFile(getChangeSetFilePath(), locations);
             Pattern[] excludedPatterns = getExcludedRegionsPatterns();
             Pattern[] includedPatterns = getIncludedRegionsPatterns();
-            TFSService service = createTFSService();
+            service = createTFSService();
 
             for (ProjectLocation location : locations) {
                 if (checkIfModifiedLocation(service, location.getProjectPath(), log, changeSets, excludedPatterns, includedPatterns)) {
@@ -192,6 +193,8 @@ public class TFSTrigger extends AbstractTrigger {
             }
         } catch (Exception ex) {
             throw new XTriggerException(ex);
+        } finally {
+            if (service != null) service.close();
         }
 
         return modified;

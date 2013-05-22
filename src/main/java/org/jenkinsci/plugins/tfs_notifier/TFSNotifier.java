@@ -37,6 +37,7 @@ public class TFSNotifier extends Notifier {
 
     @Override
     public boolean perform(AbstractBuild<?, ?> build, Launcher launcher, BuildListener listener) throws InterruptedException, IOException {
+        TFSService service = null;
         try {
             TFSTrigger trigger = (TFSTrigger)build.getProject().getTrigger(TFSTrigger.class);
 
@@ -45,7 +46,7 @@ public class TFSNotifier extends Notifier {
                 return true;
             }
 
-            TFSService service= new TFSService(trigger.getServerUrl(), trigger.getUserName(), trigger.getUserPassword());
+            service = new TFSService(trigger.getServerUrl(), trigger.getUserName(), trigger.getUserPassword());
 
             Map<String, Integer> changeSets = TFSUtil.parseChangeSetFile(getChangeSetFile(build), trigger.getLocations());
             Pattern[] excludedPatterns = trigger.getExcludedRegionsPatterns();
@@ -97,7 +98,10 @@ public class TFSNotifier extends Notifier {
 
         } catch (Exception e) {
             listener.getLogger().println(e.getMessage());
+        } finally {
+            if (service != null) service.close();
         }
+
         return true;
     }
 
